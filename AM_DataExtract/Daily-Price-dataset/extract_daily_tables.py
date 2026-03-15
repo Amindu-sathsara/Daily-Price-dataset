@@ -3,8 +3,11 @@ import pandas as pd
 import os
 import re
 
-input_folder = "../data/raw_pdfs"
-output_folder = "../data/extracted"
+# Use script directory for robust path resolution
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+_base_dir = os.path.dirname(_script_dir)
+input_folder = os.path.join(_base_dir, "data", "raw_pdfs")
+output_folder = os.path.join(_base_dir, "data", "extracted")
 os.makedirs(output_folder, exist_ok=True)
 
 # List of all possible market names (as they appear in the PDF)
@@ -44,9 +47,10 @@ def extract_market_dates(footer_text):
         return dict(zip(markets_in_footer, dates))
     else:
         # Fallback: assume all markets share the file date
-        return {}
+        return {} 
 
 # Your vegetables of interest (map to canonical names)
+# Sort by pattern length descending so longer variants match first
 VEGETABLES = {
     "beans": "beans",
     "carrot": "carrot",
@@ -57,6 +61,7 @@ VEGETABLES = {
     "cabbage (n'eliya)": "cabbage",
     "cabbage (kandy)": "cabbage"
 }
+VEGETABLES_SORTED = sorted(VEGETABLES.items(), key=lambda x: -len(x[0]))
 
 for file in os.listdir(input_folder):
     if not file.endswith(".pdf"):
@@ -77,11 +82,8 @@ for file in os.listdir(input_folder):
         footer_map = extract_market_dates(full_text)
 
         for page in pdf.pages:
-            # Try to extract the main table
-            tables = page.extract_tables({
-                "vertical_strategy": "text",
-                "horizontal_strategy": "text"
-            })
+            # Use default extraction - "text" strategy fragments table cells incorrectly
+            tables = page.extract_tables()
 
             for table in tables:
                 if not table:
@@ -110,9 +112,9 @@ for file in os.listdir(input_folder):
                     if not row or not row[0]:
                         continue
                     crop_cell = str(row[0]).strip().lower()
-                    # Check if this crop is in our list (including variations)
+                    # Check if this crop is in our list (longest pattern first)
                     matched_crop = None
-                    for pattern, can_name in VEGETABLES.items():
+                    for pattern, can_name in VEGETABLES_SORTED:
                         if pattern in crop_cell:
                             matched_crop = can_name
                             break

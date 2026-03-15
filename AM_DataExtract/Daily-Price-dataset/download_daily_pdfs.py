@@ -2,14 +2,17 @@ import requests
 import os
 from datetime import datetime, timedelta
 
-output_folder = "../data/raw_pdfs"
+# Use script directory for robust path resolution
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+_base_dir = os.path.dirname(_script_dir)
+output_folder = os.path.join(_base_dir, "data", "raw_pdfs")
 os.makedirs(output_folder, exist_ok=True)
 
 start_date = datetime(2025,1,1)
-end_date = datetime(2025,4,31)
+end_date = datetime(2025,4,30)
 
 current = start_date
-
+ 
 while current <= end_date:
 
     day = current.strftime("%d-%m-%Y")
@@ -22,20 +25,17 @@ while current <= end_date:
     path = os.path.join(output_folder, filename)
 
     try:
-
-        r = requests.get(url)
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        r = requests.get(url, headers=headers, timeout=30)
 
         if r.status_code == 200:
-
-            with open(path,"wb") as f:
+            with open(path, "wb") as f:
                 f.write(r.content)
-
             print("Downloaded:", filename)
-
         else:
             print("Not found:", filename)
 
-    except:
-        print("Error:", filename)
+    except requests.RequestException as e:
+        print("Error:", filename, str(e))
 
     current += timedelta(days=1)
