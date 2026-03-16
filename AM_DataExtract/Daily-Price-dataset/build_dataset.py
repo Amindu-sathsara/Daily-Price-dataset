@@ -14,12 +14,16 @@ for file in csv_files:
     if file.endswith(".csv"):
         df = pd.read_csv(os.path.join(input_folder, file))
         for _, row in df.iterrows():
-            price = (row["Min"] + row["Max"]) / 2
+            min_price =row["Min"]
+            max_price = row["Max"]
+            avg_price = (row["Min"] + row["Max"]) / 2
             records.append({
                 "Date": row["Date"],
                 "Crop": row["Crop"],
                 "Market": row["Market"],
-                "Price": price
+                "Min_Price": min_price,
+                "Max_Price": max_price,
+                "Avg_Price": avg_price
             })
 
 final_df = pd.DataFrame(records)
