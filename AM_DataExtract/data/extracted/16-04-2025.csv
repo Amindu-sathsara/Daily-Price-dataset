@@ -9,8 +9,7 @@ Date,Crop,Market,Min,Max
 16-04-2025,carrot,Keppetipola,450,500
 16-04-2025,carrot,Nuwaraeliya,380,400
 16-04-2025,carrot,Bandarawela,400,450
-16-04-2025,beetroot,Peliyagoda,380,400
-16-04-2025,beetroot,Peliyagoda,500,550
+16-04-2025,beetroot,Peliyagoda,380,550
 16-04-2025,beetroot,Keppetipola,280,320
 16-04-2025,beetroot,Nuwaraeliya,320,340
 16-04-2025,beetroot,Bandarawela,340,360
@@ -25,7 +24,3 @@ Date,Crop,Market,Min,Max
 16-04-2025,tomato,Keppetipola,220,250
 16-04-2025,tomato,Nuwaraeliya,240,280
 16-04-2025,tomato,Bandarawela,380,440
-16-04-2025,beans,Peliyagoda,120,180
-16-04-2025,beans,Dambulla,80,120
-16-04-2025,beans,Norochchole,80,100
-16-04-2025,beans,Bandarawela,180,190

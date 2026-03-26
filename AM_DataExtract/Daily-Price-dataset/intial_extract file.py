@@ -12,7 +12,7 @@ os.makedirs(output_folder, exist_ok=True)
 
 # List of all possible market names (as they appear in the PDF)
 MARKET_NAMES = [
-    "Pettah","Keppetipola", "Nuwaraeliya", "Bandarawela", "Veyangoda",
+    "Keppetipola", "Nuwaraeliya", "Bandarawela", "Veyangoda",
     "Peliyagoda", "Kandy", "Dambulla", "Meegoda", "Norochchole",
     "Thambuththegama"   # also appears in footer
 ]
@@ -33,52 +33,35 @@ def extract_market_dates(footer_text):
         "Keppetipola Nuwaraeliya Bandarawela Veyangoda Peliyagoda Kandy Dambulla Meegoda Norochchole 2025.03.31 2025.03.31 2025.03.31 2025.03.30 2025.03.31"
     This function aligns market names with the dates that follow.
     """
+    # A simple heuristic: find all dates (YYYY.MM.DD) and assume they correspond
+    # to the markets in order, but the footer may have extra text.
     date_pattern = r"\d{4}\.\d{2}\.\d{2}"
     dates = re.findall(date_pattern, footer_text)
+    # Remove dates from footer text to get the market list
     footer_clean = re.sub(date_pattern, "", footer_text).strip()
+    # Split by whitespace to get potential market names
     tokens = footer_clean.split()
     markets_in_footer = [t for t in tokens if t in MARKET_NAMES]
+    # If the number of dates matches the number of markets, zip them
     if len(dates) == len(markets_in_footer):
         return dict(zip(markets_in_footer, dates))
     else:
         # Fallback: assume all markets share the file date
-        return {}
+        return {} 
 
-# ===== CHANGE 1: Use regex patterns with word boundaries and ordered list =====
-# Patterns are checked in order (more specific first). All map to canonical names.
-# If a pattern maps to None, that crop is explicitly skipped (e.g., Long beans).
-VEGETABLE_PATTERNS = [
-    (r"\bLong beans\b", None),            # skip Long beans (exclude)
-    (r"\bBeet root \(Nuwaraeliya\)\b", "beetroot"),
-    (r"\bBeet root\b", "beetroot"),
-    (r"\bCabbage \(N'eliya\)\b", "cabbage"),
-    (r"\bCabbage \(Kandy\)\b", "cabbage"),
-    (r"\bCabbage\b", "cabbage"),
-    (r"\bCarrot\b", "carrot"),
-    (r"\bTomato\b", "tomato"),
-    (r"\bBeans\b", "beans"),              # only exact "Beans", after "Long beans" check
-]
-# ========================================================================
-
-# ===== CHANGE 2: New function to extract min/max from a cell =====
-def extract_prices(cell):
-    """Return (min, max) from a cell string."""
-    if not cell or cell == "-":
-        return None, None
-    cell_str = str(cell).strip()
-    # Range pattern: "100.00 - 130.00"
-    match = re.search(r'(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)', cell_str)
-    if match:
-        min_p = int(float(match.group(1)))
-        max_p = int(float(match.group(2)))
-        return min_p, max_p
-    # Fallback: extract all numbers
-    nums = re.findall(r'\d+(?:\.\d+)?', cell_str)
-    if nums:
-        ints = [int(float(n)) for n in nums]
-        return min(ints), max(ints)
-    return None, None
-# ==================================================================
+# Your vegetables of interest (map to canonical names)
+# Sort by pattern length descending so longer variants match first
+VEGETABLES = {
+    "beans": "beans",
+    "carrot": "carrot",
+    "tomato": "tomato",
+    "cabbage": "cabbage",
+    "beet root": "beetroot",
+    "beet root (n eliya)": "beetroot",
+    "cabbage (n'eliya)": "cabbage",
+    "cabbage (kandy)": "cabbage"
+}
+VEGETABLES_SORTED = sorted(VEGETABLES.items(), key=lambda x: -len(x[0]))
 
 for file in os.listdir(input_folder):
     if not file.endswith(".pdf"):
@@ -86,8 +69,9 @@ for file in os.listdir(input_folder):
 
     path = os.path.join(input_folder, file)
 
-    # Skip if already extracted
+    #I am added thse logic newly for extracting add acsending order and then also skipped reextracting that already extracted file again ..
     out_file = os.path.join(output_folder, file.replace(".pdf", ".csv"))
+    #just skipped if already extracted file exist in the extracted folder
     if os.path.exists(out_file):
         print(f"⏩ Skipped (already extracted): {file}")
         continue
@@ -95,11 +79,7 @@ for file in os.listdir(input_folder):
     date_str = file.replace(".pdf", "")   # e.g., "31-03-2025"
 
     print(f"Processing {file}...")
-
-    # ===== CHANGE 3: Use a dictionary to merge duplicates on the fly =====
-    # Key: (date, crop, market) → Value: (min_price, max_price)
-    merged = {}
-    # ===================================================================
+    rows = []
 
     with pdfplumber.open(path) as pdf:
         full_text = ""
@@ -110,6 +90,7 @@ for file in os.listdir(input_folder):
         footer_map = extract_market_dates(full_text)
 
         for page in pdf.pages:
+            # Use default extraction - "text" strategy fragments table cells incorrectly
             tables = page.extract_tables()
 
             for table in tables:
@@ -126,6 +107,7 @@ for file in os.listdir(input_folder):
                 markets = []
                 for cell in header:
                     cell_str = str(cell).strip() if cell else ""
+                    # Find which market name is in this cell
                     for m in MARKET_NAMES:
                         if m in cell_str:
                             markets.append(m)
@@ -133,21 +115,19 @@ for file in os.listdir(input_folder):
                     else:
                         markets.append(None)
 
-                # Process data rows below the header
+                # Now process data rows below the header
                 for row in table[header_idx+1:]:
                     if not row or not row[0]:
                         continue
-                    crop_cell = str(row[0]).strip()
-                    # ===== CHANGE 4: Use regex patterns for matching =====
+                    crop_cell = str(row[0]).strip().lower()
+                    # Check if this crop is in our list (longest pattern first)
                     matched_crop = None
-                    for pattern, can_name in VEGETABLE_PATTERNS:
-                        if re.search(pattern, crop_cell, re.IGNORECASE):
+                    for pattern, can_name in VEGETABLES_SORTED:
+                        if pattern in crop_cell:
                             matched_crop = can_name
                             break
-                    # If no match or matched_crop is None, skip this row
-                    if matched_crop is None:
+                    if not matched_crop:
                         continue
-                    # ===================================================
 
                     # For each market column, extract min and max
                     for col_idx, market in enumerate(markets):
@@ -157,33 +137,27 @@ for file in os.listdir(input_folder):
                             continue
                         cell = row[col_idx]
                         if not cell or cell == "-":
-                            continue
+                             continue
+                        # Extract two numbers
+                        match = re.search(r"(\d+)\s*-\s*(\d+)", str(cell))
+                        if match:
+                            min_p = int(match.group(1))
+                            max_p = int(match.group(2))
+                            # Determine date for this market
+                            mkt_date = footer_map.get(market, date_str)
+                            rows.append([
+                                mkt_date,
+                                matched_crop,
+                                market,
+                                min_p,
+                                max_p
+                            ])
 
-                        # ===== CHANGE 5: Use the new extract_prices function =====
-                        min_p, max_p = extract_prices(cell)
-                        if min_p is None or max_p is None:
-                            continue
-                        # =======================================================
-
-                        # Determine date for this market
-                        mkt_date = footer_map.get(market, date_str)
-
-                        # ===== CHANGE 6: Merge into dictionary =====
-                        key = (mkt_date, matched_crop, market)
-                        if key not in merged:
-                            merged[key] = (min_p, max_p)
-                        else:
-                            curr_min, curr_max = merged[key]
-                            merged[key] = (min(curr_min, min_p), max(curr_max, max_p))
-                        # ==========================================
-
-    # ===== CHANGE 7: Convert merged dictionary to DataFrame and save =====
-    if merged:
-        rows = [[date, crop, market, min_p, max_p] for (date, crop, market), (min_p, max_p) in merged.items()]
+    # Save extracted rows to CSV
+    if rows:
         df = pd.DataFrame(rows, columns=["Date", "Crop", "Market", "Min", "Max"])
         out_file = os.path.join(output_folder, file.replace(".pdf", ".csv"))
         df.to_csv(out_file, index=False)
         print(f"Saved {len(df)} rows to {out_file}")
     else:
         print(f"No data extracted from {file}")
-    # ======================================================================
