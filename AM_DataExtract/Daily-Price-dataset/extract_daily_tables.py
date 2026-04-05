@@ -186,4 +186,4 @@ for file in os.listdir(input_folder):
         print(f"Saved {len(df)} rows to {out_file}")
     else:
         print(f"No data extracted from {file}")
-    # ======================================================================
+    # ====================================================================
